@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true,
+    "incremental": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+
+    // 👇 ADDED: Base directory for resolving modules
+    "baseUrl": ".", 
+    // 👇 ADDED: Definition for the @/ alias
+    "paths": {
+      "@/*": ["./*"] 
+    },
+
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    // 💡 If you have other directories like 'components' that contain files 
+    // where you are using the alias, ensure they are also included here 
+    // (though "**/*.ts" and "**/*.tsx" usually cover everything).
+    "**/*.js", // Added to ensure your JS files are covered too
+    "**/*.jsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
