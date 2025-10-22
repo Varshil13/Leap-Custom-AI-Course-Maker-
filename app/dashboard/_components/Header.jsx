@@ -1,6 +1,7 @@
 import React from 'react'
 import Image from 'next/image'
 import { UserButton } from '@clerk/nextjs'
+import Link from 'next/link'
 
 
 function Header() {
@@ -13,7 +14,9 @@ function Header() {
         background: 'var(--background)',
       }}
     >
-      <Image src="/logo.png" alt="Logo" width={56} height={56} />
+      <Link href="/dashboard">
+        <Image src="/logo.png" alt="Logo" width={56} height={56} />
+      </Link>
       <div className="flex items-center gap-4">
         <UserButton />
       </div>

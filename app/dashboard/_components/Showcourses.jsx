@@ -104,6 +104,11 @@ function Showcourses() {
             {progress[course.courseId] || 0}% completed
           </span>
           <Button onClick={() => handleCourseClick(course.courseId)}>View Course</Button>
+          {progress[course.courseId] === 100 && (
+            <Button className="mt-2" variant="outline" onClick={() => alert('Certificate request coming soon!')}>
+              Get Certificate
+            </Button>
+          )}
         </div>
       ))}
     </div>
