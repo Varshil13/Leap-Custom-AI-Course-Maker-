@@ -12,7 +12,7 @@ async function generateWithRetry(prompt: string, maxRetries = 3): Promise<any> {
       // If it's a 503 (overloaded) error and we have retries left
       if (error.status === 503 && attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
-        console.log(`Retrying in ${delay}ms...`);
+        
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }

@@ -190,7 +190,7 @@ function LearnCoursePage() {
       // Cache in memory and localStorage
       setContentCache(prev => ({ ...prev, [cacheKey]: content }));
       localStorage.setItem(`course_content_${courseId}_${cacheKey}`, JSON.stringify(content));
-      console.log("parsed content",content)
+      
       return content;
 
     } catch (error) {

@@ -46,7 +46,7 @@ export default function CreateCoursePage() {
       duration: "",
       includeVideos: userCourseInput?.includeVideos ?? false,
     });
-    console.log("Saved to DB:", result);
+    
     router.replace('/createCourse/'+id+'/chooseVideos');
   }
   const checkStatus = () => {
@@ -108,8 +108,7 @@ export default function CreateCoursePage() {
         roadmap: roadmap,
       }));
 
-      console.log("AI Text:", data.text);
-      console.log("Generated Roadmap:", roadmap);
+     
     } catch (error) {
       console.error("Fetch failed:", error);
       toast.error("Failed to generate roadmap. Please try again.");

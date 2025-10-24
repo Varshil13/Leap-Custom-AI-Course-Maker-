@@ -30,10 +30,7 @@ function ChooseVideosPage() {
     }
   }, [courseId]);
 
-  // useEffect(()=>{
-  //   console.log("help",courseContent)
-
-  // },[])
+  
 
   const fetchCourse = async () => {
     setLoading(true);
@@ -71,13 +68,13 @@ function ChooseVideosPage() {
         
         // Skip YouTube API call if this lesson already has a selected video
         if (existingSelections[lessonKey]) {
-          console.log(`Skipping YouTube API for ${lessonKey} - already has selection`);
+          
           videosMap[lessonKey] = []; // Set empty array since we don't need to show other options
           continue;
         }
         
         try {
-          console.log(`Fetching YouTube videos for ${lessonKey}`);
+    
           const videos = await getVideos(lesson);
           videosMap[lessonKey] = videos;
         } catch {

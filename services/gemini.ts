@@ -12,8 +12,7 @@ export async function generateAIResponse(prompt: string): Promise<{
   text: string;
   files: AIFile[];
 }> {
-  console.log(process.env.GEMINI_API_KEY);
-  console.log(process.env.DATABASE_URL);
+ 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const model = 'gemini-2.5-flash';
 

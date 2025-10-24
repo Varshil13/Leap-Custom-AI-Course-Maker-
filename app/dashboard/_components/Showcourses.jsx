@@ -90,7 +90,7 @@ function Showcourses() {
    
   const handleCourseClick = (courseId) => {
     // Handle course click, e.g., navigate to course details page
-    console.log("Course clicked:", courseId);
+    
     router.push(`/dashboard/learnCourse/${courseId }`);
   }
 
@@ -108,21 +108,18 @@ function Showcourses() {
 
   // Fetch progress for all courses for this user
   const fetchAllProgress = async (fetchedCourses) => {
-    console.log("fetchedCourses in fetchAllProgress:", fetchedCourses);
-
     const progressObj = { ...progressCache };
-    console.log("Courses to fetch progress for:", fetchedCourses);
     for (const course of fetchedCourses) {
       if (progressObj[course.courseId] !== undefined) {
         // Already cached, skip API call
         continue;
       }
-      console.log("Fetching progress for course:", course.courseId);
+  
       // Fetch progress from API
       const res = await fetch(`/api/progress?courseId=${course.courseId}`);
       if (!res.ok) continue;
       const data = await res.json();
-      console.log("Progress data for course", course.courseId, ":", data);
+     
       const watchedCount = Object.values(data.progress || {}).filter(Boolean).length;
       // Calculate total lessons (subtopics)
       let totalLessons = 0;
@@ -135,7 +132,7 @@ function Showcourses() {
       const percent = totalLessons > 0 ? Math.round((watchedCount / totalLessons) * 100) : 0;
       progressObj[course.courseId] = percent;
     }
-    console.log("progress obj pre-set:", progressObj);
+
     setProgress(progressObj);
     setProgressCache(progressObj); // update cache
     // Save to localStorage for persistence
@@ -145,7 +142,7 @@ function Showcourses() {
         localStorage.setItem('progressCache', JSON.stringify(progressObj));
       } catch {}
     }
-    console.log("fetched progress");
+    
   };
 
 

@@ -57,7 +57,7 @@ export default function AlterRoadmap() {
       ...prev,
       roadmap: topics,
     }));
-    console.log("Updated roadmap:", topics);
+   
   }, [topics, setUserCourseInput]);
 
  
