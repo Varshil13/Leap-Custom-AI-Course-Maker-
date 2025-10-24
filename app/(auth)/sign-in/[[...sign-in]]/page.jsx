@@ -21,6 +21,8 @@ export default function Page() {
             {/* Clerk SignIn Component */}
             <div className="flex items-center justify-center">
               <SignIn 
+                redirectUrl="/dashboard"
+                fallbackRedirectUrl="/dashboard"
                 appearance={{
                   elements: {
                     formButtonPrimary: 

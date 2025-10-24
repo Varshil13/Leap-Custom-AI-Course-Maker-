@@ -2,15 +2,16 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { db } from "@/services/db";
-import { CourseDetails,CourseContent } from "@/services/schema";
+import { CourseDetails } from "@/services/schema";
 import getVideos from "@/services/youtube";
 import LoadingDialouge from "@/app/createCourse/_components/LoadingDialouge";
 import { eq } from "drizzle-orm";
 import { CourseVideos } from "@/services/schema";
-import { extractJsonArray } from "@/app/_utils/extractJsonArray";
+import toast from "react-hot-toast";
 
 
 function ChooseVideosPage() {
+  const [finishing, setFinishing] = useState(false);
   const params = useParams();
   const courseId = params.courseId;
   const [course, setCourse] = useState(null);
@@ -20,7 +21,6 @@ function ChooseVideosPage() {
   const [selectedVideos, setSelectedVideos] = useState({});
   const [showCustomInput, setShowCustomInput] = useState({});
   const [customUrls, setCustomUrls] = useState({});
-  const [courseContent, setCourseContent] = useState([]);
   
 
 
@@ -89,139 +89,7 @@ function ChooseVideosPage() {
   };
 
 
-   const  generateCourseContent = async () => {
 
-      const result = await db
-      .select()
-      .from(CourseDetails)
-      .where(eq(CourseDetails.courseId, courseId));
-      console.log("Fetched Course for Content Generation:", result);
-      const courseData = result[0];
-      console.log("Course Data for Content Generation:", courseData);
-
-      const roadmap = courseData?.roadmap
-      const level = courseData?.level ;
-
-      console.log("Generating content for roadmap:", roadmap);
-      console.log("Course Topic:", level);
-     
-
-  const prompt = `You are an expert educator and curriculum designer. For the following course roadmap, generate comprehensive, in-depth course content for each chapter and its subtopics.
-
-Instructions:
-- For each chapter, write a detailed introduction explaining the chapter purpose and importance.
-- For each subtopic, write a thorough, self-contained explanation that covers all essential concepts, practical details, and advanced insights as needed for the specified course level.
-- The content should be complete enough that a learner can read it and fully understand the topic without needing other resources.
-- If the course level is "advanced", provide deeper technical details, examples, and expert tips.
-- Do NOT use markdown, bullet points, or formatting—just plain text.
-- Output should be a valid JSON array as shown below.
-
-
-Course Level: ${level}
-Course Roadmap: ${JSON.stringify(roadmap)}
-
-Roadmap Example:
-[
-  { "id": "1", "title": "Chapter Title One", "subtopics": ["Subtopic A", "Subtopic B"] },
-  { "id": "2", "title": "Chapter Title Two", "subtopics": ["Subtopic C", "Subtopic D"] }
-]
-
-Output Format Example:
-[
-  {
-    "chapter": "Chapter Title One",
-    "introduction": "In-depth introduction text...",
-    "subtopics": [
-      { "name": "Subtopic A", "content": "Comprehensive explanation for Subtopic A." },
-      { "name": "Subtopic B", "content": "Comprehensive explanation for Subtopic B." }
-    ]
-  },
-  ...
-]
-`
-
-try {
-      // 1. Send the request to your Next.js API Route
-      const response = await fetch("/api/genCourseDetails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
-      }
-
-      // 2. Get the structured result from the API
-      const data = await response.json();
-
-      // Parse the roadmap from the AI response text
-      console.log(data,data.text);
-      
-      let courseContent = [];
-      try {
-        // Try to extract JSON array first
-        courseContent = extractJsonArray(data.text);
-        console.log("Extracted course content:", courseContent);
-      } catch (extractError) {
-        console.error("Failed to extract JSON array:", extractError);
-        
-        // Fallback: Try to find and parse JSON manually
-        try {
-          const jsonMatch = data.text.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            courseContent = JSON.parse(jsonMatch[0]);
-            console.log("Manually parsed course content:", courseContent);
-          } else {
-            console.error("No JSON array found in response");
-            alert("The AI response format is invalid. Please try again.");
-            return;
-          }
-        } catch (manualError) {
-          console.error("Manual JSON parsing also failed:", manualError);
-          alert("Failed to parse AI response. Please try again.");
-          return;
-        }
-      }
-      
-      // Validate the structure before setting state
-      if (!Array.isArray(courseContent)) {
-        console.error("Course content is not an array:", courseContent);
-        alert("Invalid course content format. Please try again.");
-        return;
-      }
-      
-      // Validate each chapter has required structure
-      const isValidStructure = courseContent.every(chapter => 
-        chapter && 
-        typeof chapter.chapter === 'string' && 
-        Array.isArray(chapter.subtopics) &&
-        chapter.subtopics.every(subtopic => 
-          subtopic && 
-          typeof subtopic.name === 'string' && 
-          typeof subtopic.content === 'string'
-        )
-      );
-      
-      if (!isValidStructure) {
-        console.error("Course content has invalid structure:", courseContent);
-        alert("Course content structure is invalid. Please try again.");
-        return;
-      }
-
-      setCourseContent(courseContent);
-      console.log("Course Content Generated successfully:", courseContent);
-      return courseContent; // Return for use in finish button
-
-    } catch (error) {
-      console.error("Fetch failed:", error);
-      alert("Failed to generate course content. Please try again.");
-      return null;
-    }
-  
-  }
 
 
   const saveSelectedVideos = async () => {
@@ -243,61 +111,10 @@ try {
     if (videoInserts.length > 0) {
       await db.insert(CourseVideos).values(videoInserts);
     }
-    alert("Videos saved successfully!");
+    toast.success("Videos saved successfully!");
   };
 
-  // Save generated course content to course_content table
-  const saveCourseContent = async (courseContent) => {
-    try {
-      console.log("Starting to save course content:", courseContent);
-      
-      if (!Array.isArray(courseContent) || courseContent.length === 0) {
-        console.error("Invalid course content format:", courseContent);
-        throw new Error("Course content is not a valid array");
-      }
-      
-      // Remove existing content for this course
-      await db.delete(CourseContent).where(eq(CourseContent.courseId, courseId));
-      
-      const contentInserts = [];
-      
-      for (const chapter of courseContent) {
-        if (!chapter || !chapter.chapter || !Array.isArray(chapter.subtopics)) {
-          console.warn("Skipping invalid chapter:", chapter);
-          continue;
-        }
-        
-        const chapterTitle = chapter.chapter;
-        
-        for (const sub of chapter.subtopics) {
-          if (!sub || !sub.name || !sub.content) {
-            console.warn("Skipping invalid subtopic:", sub);
-            continue;
-          }
-          
-          contentInserts.push({
-            courseId,
-            chapterTitle,
-            subtopicName: sub.name,
-            contentData: { content: sub.content },
-          });
-        }
-      }
-      
-      console.log("Prepared Course Content for Insertion:", contentInserts);
-      
-      if (contentInserts.length === 0) {
-        throw new Error("No valid content to insert");
-      }
-      
-      await db.insert(CourseContent).values(contentInserts);
-      console.log("Successfully inserted course content");
-      
-    } catch (error) {
-      console.error("Error saving course content:", error);
-      throw error;
-    }
-  };
+
 
 const loadExistingVideos = async () => {
   const existingVideos = await db
@@ -318,9 +135,10 @@ const loadExistingVideos = async () => {
 
 
   return (
-  <div className="max-w-3xl mx-auto mt-10 p-6" style={{ background: 'var(--background)' }}>
+    <div className="max-w-3xl mx-auto mt-10 p-6" style={{ background: 'var(--background)' }}>
       <LoadingDialouge loading={loading} activeStep={'Fetching Videos'} />
-  <h2 className="font-bold text-2xl mb-6 text-center text-foreground">Choose Videos</h2>
+      <LoadingDialouge loading={finishing} activeStep={'Finishing Course'} />
+      <h2 className="font-bold text-2xl mb-6 text-center text-foreground">Choose Videos</h2>
       {!course && <div>Loading course...</div>}
       {course && (
         <>
@@ -483,45 +301,28 @@ const loadExistingVideos = async () => {
             ))}
           </div>
           
-          {/* Save and Finish Buttons */}
+          {/* Only Finish Button */}
           <div className="mt-8 text-center flex gap-4 justify-center">
-            <button
-              className="px-6 py-3 rounded-lg font-semibold"
-              style={{ background: 'var(--primary)', color: 'white' }}
-              onClick={saveSelectedVideos}
-              disabled={Object.keys(selectedVideos).length === 0}
-            >
-              Save Selected Videos ({Object.keys(selectedVideos).length} selected)
-            </button>
             <button
               className="px-6 py-3 rounded-lg font-semibold"
               style={{ background: '#22d3ee', color: 'white' }}
               onClick={async () => {
                 try {
-                  setLoading(true);
-                  // Generate course content first and get the result
-                  const generatedContent = await generateCourseContent();
-                  if (!generatedContent) {
-                    alert("Failed to generate course content. Please try again.");
-                    setLoading(false);
-                    return;
-                  }
-                  // Save videos
+                  setFinishing(true);
+                  // Save videos only - content will be generated on-demand
                   await saveSelectedVideos();
-                  // Save course content using the generated content
-                  await saveCourseContent(generatedContent);
-                  alert("Course completed successfully!");
+                  toast.success("Course setup completed successfully! Content will be generated when you access each lesson.");
                   window.location.href = `/dashboard`;
                 } catch (error) {
                   console.error("Error finishing course:", error);
-                  alert("An error occurred while finishing the course. Please try again.");
+                  toast.error("An error occurred while finishing the course. Please try again.");
                 } finally {
-                  setLoading(false);
+                  setFinishing(false);
                 }
               }}
-              disabled={Object.keys(selectedVideos).length === 0 || loading}
+              disabled={Object.keys(selectedVideos).length === 0 || finishing}
             >
-              {loading ? "Processing..." : "Finish Course"}
+              {finishing ? "Processing..." : "Finish Course"}
             </button>
           </div>
         </>

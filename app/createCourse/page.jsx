@@ -9,6 +9,7 @@ import AlterRoadmap from "./_components/AlterRoadmap";
 import { UserInputContext } from "../_context/UserInputContext";
 import { Button } from "@/components/ui/button";
 import LoadingDialouge from "./_components/LoadingDialouge";
+import toast from "react-hot-toast";
 import { CourseDetails } from "@/services/schema";
 import { v4 } from 'uuid';
 import { useUser } from "@clerk/nextjs";
@@ -111,7 +112,7 @@ export default function CreateCoursePage() {
       console.log("Generated Roadmap:", roadmap);
     } catch (error) {
       console.error("Fetch failed:", error);
-      alert("Failed to generate roadmap. Please try again.");
+      toast.error("Failed to generate roadmap. Please try again.");
     }
   };
 

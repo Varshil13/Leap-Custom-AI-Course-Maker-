@@ -9,13 +9,14 @@ function Addcourse() {
 
   return (
   <div className='flex justify-between items-center '>
-    <div>
+    <div className='p-5'>
       <h2 className='text-3xl text-foreground'>Hello, 
-        <span className='font-bold text-primary'>{user?.fullName}</span></h2>
-        <p className='text-sm' style={{ color: 'var(--muted-foreground)' }}>Create new course with AI</p>
+        <span className='font-bold text-primary'>{user?.fullName}</span>
+        </h2>
+        
     </div>
     <Link href='/createCourse'>
-      <Button>+ Create AI Course</Button>
+      <Button>+ Create Course</Button>
     </Link>
   </div>
   )

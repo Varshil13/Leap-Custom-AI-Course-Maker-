@@ -9,10 +9,11 @@ import { Progress } from '../../../components/ui/progress'
 function Sidebar() {
     
 
-    const MenuItems= [
-        {id:1,name:'Home',icon:<HiOutlineHome />,path:'/dashboard'},
-        {id:2,name:'Upgrade',icon:<HiOutlineShieldCheck />,path:'/dashboard/upgrade'},
-      ]  
+        const MenuItems= [
+                {id:1,name:'Home',icon:<HiOutlineHome />,path:'/dashboard'},
+                {id:2,name:'Completed',icon:<HiOutlineSquare3Stack3D />,path:'/dashboard/completed'},
+                {id:3,name:'Upgrade',icon:<HiOutlineShieldCheck />,path:'/dashboard/upgrade'},
+            ]
     
     const path = usePathname();
       return (
@@ -55,12 +56,12 @@ function Sidebar() {
                 ))}
             </ul>
             <hr className='my-5' style={{ borderColor: 'var(--sidebar-border)' }} />
-            {/* Progress Bar */}
+            {/* Progress Bar
             <div className='absolute bottom-10 w-[80%]'>
                 <Progress value={60} />
                 <h2 className='text-sm my-2' style={{ color: 'var(--sidebar-foreground)' }}> 3 out of 5 courses created</h2>
                 <h2 className='text-xs' style={{ color: 'var(--muted-foreground)' }}>Upgrade your plan for unlimited course generation </h2>
-            </div>
+            </div> */}
         </div>
   )
 }

@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from "react";
+import { invalidateProgressCache } from "../../_components/Showcourses";
 import { useParams } from "next/navigation";
 import { db } from "@/services/db";
 import { CourseDetails, CourseVideos, CourseContent } from "@/services/schema";
@@ -8,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useContext } from "react";
 import { extractJsonArray } from "@/app/_utils/extractJsonArray";
 import { useUser } from "@clerk/nextjs";
+import LaTeXRenderer from "@/app/_components/LaTeXRenderer";
+import 'katex/dist/katex.min.css';
 
 
 
@@ -25,6 +28,8 @@ function LearnCoursePage() {
   // Track watched state per lessonKey, now persisted
   const [watched, setWatched] = useState({});
   const [loadingProgress, setLoadingProgress] = useState(false);
+  const [generatingContent, setGeneratingContent] = useState(false);
+  const [contentCache, setContentCache] = useState({});
 
   useEffect(() => {
     if (courseId && user) {
@@ -77,6 +82,8 @@ function LearnCoursePage() {
     const newWatched = !watched[lessonKey];
     setWatched(prev => ({ ...prev, [lessonKey]: newWatched }));
     await saveProgress(chapterTitle, subtopicName, newWatched);
+    // Invalidate dashboard progress cache for this course
+    invalidateProgressCache(courseId);
   };
 
 
@@ -88,6 +95,110 @@ function LearnCoursePage() {
       .from(CourseContent)
       .where(eq(CourseContent.courseId, courseId));
     setCourseContent(Array.isArray(rows) ? rows : []);
+  };
+
+  // Check if content exists for a specific subtopic
+  const getContentForSubtopic = (chapterTitle, subtopicName) => {
+    // First check database content
+    const dbContent = courseContent.find(
+      (row) => row.chapterTitle === chapterTitle && row.subtopicName === subtopicName
+    );
+    if (dbContent?.contentData?.content) return dbContent;
+
+    // Then check cache
+    const cacheKey = `${chapterTitle}__${subtopicName}`;
+    const cachedContent = contentCache[cacheKey];
+    if (cachedContent) return { contentData: { content: cachedContent } };
+
+    // Check localStorage cache
+    try {
+      const localCache = localStorage.getItem(`course_content_${courseId}_${cacheKey}`);
+      if (localCache) {
+        const content = JSON.parse(localCache);
+        setContentCache(prev => ({ ...prev, [cacheKey]: content }));
+        return { contentData: { content } };
+      }
+    } catch (error) {
+      console.error("Error reading from localStorage:", error);
+    }
+
+    return null;
+  };
+
+  // Generate content for a specific subtopic
+  const generateSubtopicContent = async (chapterTitle, subtopicName) => {
+    const cacheKey = `${chapterTitle}__${subtopicName}`;
+    
+    try {
+      setGeneratingContent(true);
+
+      // Get course info for context
+      const language = course?.description?.toLowerCase().includes('python') ? 'python' :
+                      course?.description?.toLowerCase().includes('java') ? 'java' :
+                      course?.description?.toLowerCase().includes('cpp') ? 'cpp' :
+                      course?.description?.toLowerCase().includes('javascript') ? 'javascript' : 'general';
+
+      const response = await fetch('/api/genSubtopicContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseName: course?.name || 'Programming Course',
+          courseDescription: course?.description || '',
+          level: course?.level || 'Beginner',
+          chapterTitle,
+          subtopicName,
+          language
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate content');
+
+      const data = await response.json();
+      
+      // Extract content from AI response - now expecting direct LaTeX
+      let content = data.text;
+
+      // Clean up any potential JSON wrapper if present
+      if (content.startsWith('{') && content.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(content);
+          content = parsed.content || content;
+        } catch {
+          // If JSON parsing fails, use as is
+        }
+      }
+
+      // Clean up LaTeX content
+      content = content.trim();
+
+      // Save to database
+      await db.insert(CourseContent).values({
+        courseId,
+        chapterTitle,
+        subtopicName,
+        contentData: { content }
+      });
+
+      // Update local state
+      setCourseContent(prev => [...prev, {
+        courseId,
+        chapterTitle,
+        subtopicName,
+        contentData: { content }
+      }]);
+
+      // Cache in memory and localStorage
+      setContentCache(prev => ({ ...prev, [cacheKey]: content }));
+      localStorage.setItem(`course_content_${courseId}_${cacheKey}`, JSON.stringify(content));
+      console.log("parsed content",content)
+      return content;
+
+    } catch (error) {
+      console.error('Error generating content:', error);
+      throw error;
+    } finally {
+      setGeneratingContent(false);
+    }
   };
 
  
@@ -219,13 +330,9 @@ function LearnCoursePage() {
               const [chapterTitle, subtopicName] = selectedKey.split("__");
               const videoData = getVideoForKey(chapterTitle, subtopicName);
               // Find course content for this subtopic
-              const contentRow = courseContent.find(
-                (row) => row.chapterTitle === chapterTitle && row.subtopicName === subtopicName
-              );
+              const contentRow = getContentForSubtopic(chapterTitle, subtopicName);
               // Find chapter explanation (where subtopicName === chapterTitle)
-              const chapterExplanation = courseContent.find(
-                (row) => row.chapterTitle === chapterTitle && row.subtopicName === chapterTitle
-              );
+              const chapterExplanation = getContentForSubtopic(chapterTitle, chapterTitle);
               if (!videoData) return <div className="text-gray-400">No video found for this subtopic.</div>;
               if (videoData.skipped) return <div className="text-gray-400">This subtopic was skipped.</div>;
               let videoSection = null;
@@ -302,13 +409,13 @@ function LearnCoursePage() {
                   </div>
 
                   {/* Video Player */}
-                  <div className="rounded-xl overflow-hidden shadow-lg mb-6" style={{ background: 'black' }}>
+                  <div className="rounded-xl overflow-hidden shadow-lg mb-8" style={{ background: 'black' }}>
                     {videoSection}
                   </div>
 
                   {/* Video Details */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>
                       {videoData.snippet?.title || subtopicName}
                     </h3>
                     {videoData.snippet?.channelTitle && (
@@ -317,24 +424,74 @@ function LearnCoursePage() {
                   </div>
 
                   {/* Chapter Introduction */}
-                  {subtopicName === chapterTitle && chapterExplanation && chapterExplanation.contentData?.content && (
-                    <div className="mb-6 p-6 rounded-r-lg" style={{ background: 'var(--muted)', borderLeft: '4px solid var(--primary)' }}>
-                      <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--primary)' }}>Chapter Overview</h4>
-                      <p className="leading-relaxed" style={{ color: 'var(--foreground)' }}>{chapterExplanation.contentData.content}</p>
+                  {subtopicName === chapterTitle && (
+                    <div className="mb-8 p-8 rounded-lg" style={{ background: 'var(--muted)', borderLeft: '4px solid var(--primary)' }}>
+                      <h4 className="text-xl font-semibold mb-4" style={{ color: 'var(--primary)' }}>Chapter Overview</h4>
+                      {chapterExplanation && chapterExplanation.contentData?.content ? (
+                        <LaTeXRenderer content={chapterExplanation.contentData.content} />
+                      ) : (
+                        <div className="text-center py-4">
+                          <p style={{ color: 'var(--muted-foreground)' }} className="mb-3">
+                            Chapter overview content not generated yet.
+                          </p>
+                          <Button
+                            onClick={async () => {
+                              try {
+                                await generateSubtopicContent(chapterTitle, chapterTitle);
+                              } catch (error) {
+                                console.error('Failed to generate chapter content:', error);
+                                alert('Failed to generate chapter content. Please try again.');
+                              }
+                            }}
+                            size="sm"
+                            style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                          >
+                            Generate Chapter Overview
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Lesson Content */}
-                  {contentRow && contentRow.contentData?.content && (
-                    <div className="p-6 rounded-lg border" style={{ background: 'var(--muted)', borderColor: 'var(--border)' }}>
-                      <h4 className="text-lg font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Lesson Content</h4>
-                      <div className="prose prose-gray max-w-none">
-                        <p className="leading-relaxed whitespace-pre-line" style={{ color: 'var(--foreground)' }}>
-                          {contentRow.contentData.content}
-                        </p>
+                  <div className="p-8 rounded-lg border" style={{ background: 'var(--muted)', borderColor: 'var(--border)' }}>
+                    <h4 className="text-xl font-semibold mb-4" style={{ color: 'var(--foreground)' }}>Lesson Content</h4>
+                    {generatingContent ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          <p style={{ color: 'var(--muted-foreground)' }}>Generating content for this lesson...</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : contentRow && contentRow.contentData?.content ? (
+                      <LaTeXRenderer content={contentRow.contentData.content} />
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 py-8">
+                        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'var(--background)' }}>
+                          <span className="text-2xl">📝</span>
+                        </div>
+                        <div className="text-center">
+                          <p className="mb-3" style={{ color: 'var(--muted-foreground)' }}>
+                            Content for this lesson hasn't been generated yet.
+                          </p>
+                          <Button
+                            onClick={async () => {
+                              try {
+                                await generateSubtopicContent(chapterTitle, subtopicName);
+                              } catch (error) {
+                                console.error('Failed to generate content:', error);
+                                alert('Failed to generate content. Please try again.');
+                              }
+                            }}
+                            className="px-6 py-2"
+                            style={{ background: '#22d3ee', color: 'white' }}
+                          >
+                            Generate Content
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
