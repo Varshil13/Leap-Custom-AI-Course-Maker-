@@ -9,7 +9,7 @@ function Header() {
         
           <Image src="/logo.png" alt="Logo" width={50} height={50} />
        
-        <Button>Click Me</Button>
+        
     </div>
   )
 }
