@@ -1,5 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-import mime from 'mime';
 import 'dotenv/config';
 
 type AIFile = {
@@ -12,45 +10,51 @@ export async function generateAIResponse(prompt: string): Promise<{
   text: string;
   files: AIFile[];
 }> {
- 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = 'gemini-2.5-flash';
+  const apiKey = process.env.GROQ_API_KEY || process.env.GROK_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing GROQ_API_KEY (or GROK_API_KEY) environment variable.');
+  }
 
-  const response = await ai.models.generateContentStream({
-    model,
-    config: { temperature: 0.9, responseModalities: ['TEXT'] },
-    contents: [{ role: 'user', parts: [{ text: prompt }]}],
+  const model = 'openai/gpt-oss-20b';
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.9,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    }),
   });
 
-  let text = '';
-  const files: AIFile[] = [];
-  let fileIndex = 0;
-
-  for await (const chunk of response) {
-    const parts = chunk.candidates?.[0]?.content?.parts;
-    if (!parts || parts.length === 0) {
-      if (chunk.text) text += chunk.text;
-      continue;
-    }
-
-    const part = parts[0];
-
-    // Collect text
-    if (chunk.text) text += chunk.text;
-
-    // Collect inline binary, if any
-    if (part.inlineData) {
-      const mimeType = part.inlineData.mimeType || 'application/octet-stream';
-      const ext = mime.getExtension(mimeType) || 'bin';
-      const filename = `gemini_${fileIndex++}.${ext}`;
-
-      files.push({
-        filename,
-        mimeType,
-        dataBase64: part.inlineData.data || '',
-      });
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    const error = new Error(`Groq API error: ${response.status} ${errorText}`) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  const text =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+      ? content
+          .map((part: { text?: string }) => part?.text || '')
+          .join('')
+      : '';
+
+  // Kept for compatibility with existing route handlers.
+  const files: AIFile[] = [];
 
   return { text, files };
 }
