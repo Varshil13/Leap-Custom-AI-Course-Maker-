@@ -21,6 +21,9 @@ function ChooseVideosPage() {
   const [selectedVideos, setSelectedVideos] = useState({});
   const [showCustomInput, setShowCustomInput] = useState({});
   const [customUrls, setCustomUrls] = useState({});
+
+  const buildVideoQuery = (topicName, subtopicName) =>
+    [topicName, subtopicName].filter(Boolean).join(" ");
   
 
 
@@ -53,14 +56,14 @@ function ChooseVideosPage() {
           : courseData.roadmap ?? [];
       setRoadmap(roadmapData);
       const existingSelections = await loadExistingVideos(); // Load existing first
-      await fetchAllLessonVideos(roadmapData, existingSelections); // Pass existing to skip API calls
+      await fetchAllLessonVideos(roadmapData, existingSelections, courseData?.name); // Pass existing to skip API calls
     } catch {
       setRoadmap([]);
     }
     setLoading(false);
   };
 
-  const fetchAllLessonVideos = async (roadmapData, existingSelections = {}) => {
+  const fetchAllLessonVideos = async (roadmapData, existingSelections = {}, topicName = "") => {
     const videosMap = {};
     for (const chapter of roadmapData) {
       for (const lesson of chapter.subtopics) {
@@ -74,8 +77,8 @@ function ChooseVideosPage() {
         }
         
         try {
-    
-          const videos = await getVideos(lesson);
+          const searchQuery = buildVideoQuery(topicName, lesson);
+          const videos = await getVideos(searchQuery);
           videosMap[lessonKey] = videos;
         } catch {
           videosMap[lessonKey] = [];
@@ -198,7 +201,8 @@ const loadExistingVideos = async () => {
                                     if (!lessonVideos[lessonKey] || lessonVideos[lessonKey].length === 0) {
                                       try {
                                         const lessonName = lessonKey.split('__')[1];
-                                        const videos = await getVideos(lessonName);
+                                        const searchQuery = buildVideoQuery(course?.name, lessonName);
+                                        const videos = await getVideos(searchQuery);
                                         setLessonVideos(prev => ({ ...prev, [lessonKey]: videos }));
                                       } catch (error) {
                                         console.error("Error fetching videos:", error);
